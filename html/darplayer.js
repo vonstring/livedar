@@ -225,8 +225,9 @@ class DARPlayer {
 
     if (changed) {
         clearTimeout(this._resize_timer);
+        let s = this;
         this._resize_timer = setTimeout(function() {
-            this.resize(this.videoElement, pos, force);
+            s.resize(this.videoElement, pos, force);
         }, 1000);
         return;
     }
