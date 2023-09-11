@@ -32,7 +32,6 @@ class DashDownloader:
         # Set up the requests session
         self.session = requests.Session()
         self.session.headers.update({'Referer': self.referrer, "User-Agent": self.user_agent})
-        self.republish = republish
 
         self.video_queues = []
 
