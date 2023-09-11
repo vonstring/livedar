@@ -878,8 +878,6 @@ class Analyzer:
 
         faces = self.track_faces(ret)
 
-        print("faces:", len(faces))
-
         return self.select_by_face(faces, iframes=iframes)
 
 
