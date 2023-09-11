@@ -109,3 +109,9 @@ docker run -it --rm -v /var/www:/var/www -u $UID livedar /bin/bash
 
 ./dar.py -s <URL> -r <REFERRER> -o <DESTINATION>
 ```
+
+
+## Player
+
+In the html directory, a player is provided. It wraps the Shaka player, and takes in two URLs - the first is the manifest (mpd) file, the second is the DAR json file, as produced by dar.py.
+
