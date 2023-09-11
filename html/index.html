@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!--    <script src="shaka-player.compiled.min.js"></script>-->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.4.1/shaka-player.compiled.js"></script>
+    <title></title>
+
+
+  <script src="https://mcorp.no/lib/mcorp-2.0.1.js"></script>
+  <script src="https://mcorp.no/lib/mediasync.js"></script>
+  <script src="https://webtiming.github.io/timingsrc/lib/timingsrc-v3.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="darplayer.js"></script>
+
+
+</head>
+
+<body>
+
+
+<div class="maincontent videocontainer">
+
+<div class="markingbox"></div>
+    <video id="video"
+           poster="//shaka-player-demo.appspot.com/assets/poster.jpg"
+           controls autoplay></video>
+
+  <div class="overlay">
+    <div role="button" class="nrk-unset" href="#" id="playbtn" aria-label="Click to play">
+      <img class="fullsize" src="playbutton.png" alt="Play symbol"/>
+    </div>
+  </div>
+  <div class="subtitle hidden" aria-hidden="true"><span></span></div>
+
+</div>  <!-- videocontainer -->
+
+<script>
+
+
+
+
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+          results = regex.exec(location.search);
+    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+  }
+
+// Multi-device sync
+if (getParameterByName("multi")) {}
+  appId = "6400235305314115206"
+;
+
+const darPlayer = new DARPlayer(
+  'https://seer2.itek.norut.no/njaallive/stream.mpd',
+  "https://seer2.itek.norut.no/njaallive/dar.json",
+  "video",
+  "#playbtn",
+  ".markingbox",
+  ".overlay",
+  appId
+);
+
+</script>
+
+
+</body>
+</html>
