@@ -86,7 +86,7 @@ class DARPlayer {
             console.log("UPDATING TO", vid.currentTime)
             this.to.update({position: vid.currentTime, velocity: 1});
         }
-        if (this.sync === undefined && this.app.ready) {
+        if (this.sync === undefined && this.app?.ready) {
           console.log(" **** Synchronizing ****")
           this.sync = MCorp.mediaSync(document.querySelector("video"), this.to);
         }
