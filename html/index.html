@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mux.js/5.10.0/mux.min.js"></script>
 <!--    <script src="shaka-player.compiled.min.js"></script>-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.4.1/shaka-player.compiled.js"></script>
     <title></title>
@@ -26,7 +26,7 @@
 <div class="markingbox"></div>
     <video id="video"
            poster="//shaka-player-demo.appspot.com/assets/poster.jpg"
-           controls autoplay></video>
+           controls playsinline></video>
 
   <div class="overlay">
     <div role="button" class="nrk-unset" href="#" id="playbtn" aria-label="Click to play">
@@ -54,16 +54,43 @@ if (getParameterByName("multi")) {}
   appId = null;
 ;
 
-const darPlayer = new DARPlayer(
-  'https://seer2.itek.norut.no/njaallive/stream.mpd',
-  "https://seer2.itek.norut.no/njaallive/dar.json",
-  "video",
-  "#playbtn",
-  ".markingbox",
-  ".overlay",
-  appId
-);
+shaka.Player.probeSupport().then(support => {
+  let streamFormat;
+  if (support.manifest.mpd) {
+    streamFormat = "DASH";
+  } else {
+    streamFormat = "HLS";
+  }
+  return fetch(`https://dar.vonstreng.com/play/1153546?stream=${streamFormat}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      device: {
+        id: "1-1-1",
+        name: "Nettleser (HTML)"
+      }
+    })
+  });
+})
+.then(response => response.json())
+.then(data => {
+  const dashStreamUrl = data.playback.streams[0].url;  
+  darPlayer = new DARPlayer(
+    dashStreamUrl,
+    "dar.json",
+    "video",
+    "#playbtn",
+    ".markingbox",
+    ".overlay",
+    appId
+  );
 
+})
+.catch(error => {
+  console.error('Error:', error);
+});
 </script>
 
 

@@ -49,8 +49,15 @@ class DARPlayer {
   async initPlayer() {
     // Create a Player instance.
     const player = new shaka.Player(this.videoElement);
+    player.configure({
+      manifest: {
+        dash: {
+          autoCorrectDrift: false
+        }
+      }
+    })
 
-    this.player = player;
+    window.shakaPlayer = this.player = player;
 
     // Listen for error events.
     player.addEventListener('error', this.onErrorEvent);
@@ -58,6 +65,8 @@ class DARPlayer {
     // Try to load a manifest.
     // This is an asynchronous process.
     try {
+      console.log("loading");
+      console.log(this.manifestUri);
       await player.load(this.manifestUri);
       // This runs if the asynchronous load is successful.
       console.log('The video has now been loaded!');
@@ -75,33 +84,39 @@ class DARPlayer {
     console.error('Error code', error.code, 'object', error);
   }
 
+
   handlePlayButtonClick(evt) {
     document.querySelector(".overlay").style.display = "None";
     let vid = this.videoElement;
     vid.addEventListener("playing",  x => {
         setTimeout(() => this.resize(vid, [50, 50]), 0);
 
-        console.log("Playing, current time is", vid.currentTime, this.to.pos, this.to.pos - vid.currentTime);
-        if (Math.abs(vid.currentTime - this.to.pos) > 2) {
-            console.log("UPDATING TO", vid.currentTime)
-            this.to.update({position: vid.currentTime, velocity: 1});
+        const currentTime = vid.currentTime;
+        console.log("Playing, current time is", currentTime, this.to.pos, this.to.pos - currentTime);
+        if (Math.abs(currentTime - this.to.pos) > 2) {
+            console.log("UPDATING TO", currentTime)
+            this.to.update({position: currentTime, velocity: 1});
         }
         if (this.sync === undefined && this.app?.ready) {
           console.log(" **** Synchronizing ****")
-          this.sync = MCorp.mediaSync(document.querySelector("video"), this.to);
+          this.sync = MCorp.mediaSync(this.videoElement, this.to);
         }
     });
     vid.play();
   }
 
   updateAuxData() {
+    const timestampOffset = this.player.getPresentationStartTimeAsDate().getTime() / 1000;
     fetch(this.darUri).then(res => res.json())
     .then(response => {
         this.sequencer.clear();
         response.forEach(item => {
             item.type = item.type || "aux";
-            this.sequencer.addCue(String(Math.random()), new TIMINGSRC.Interval(item.start, item.end), item);
+            this.sequencer.addCue(String(Math.random()), new TIMINGSRC.Interval(item.start - timestampOffset, item.end - timestampOffset), item);
         });
+        const lastTime = response[response.length-1].end - timestampOffset;
+        const currentTime = this.videoElement.currentTime;
+        console.log(lastTime, currentTime, lastTime - currentTime);
     });
   }
 
@@ -115,7 +130,7 @@ class DARPlayer {
     }
 
     if (this.options.dar) {
-      mbox.style.display = "None";
+      mbox.style.display = "none";
       this.pos_timer = setTimeout(() => this.resize(this.videoElement, [50,50]), 1000);
       this.resize(this.videoElement, item.new.data.pos);      
     } else {
@@ -225,10 +240,14 @@ class DARPlayer {
 
     if (changed) {
         clearTimeout(this._resize_timer);
+<<<<<<< HEAD
         let s = this;
         this._resize_timer = setTimeout(function() {
             s.resize(this.videoElement, pos, force);
         }, 1000);
+=======
+        this._resize_timer = setTimeout(() => this.resize(this.videoElement, pos, force), 1000);
+>>>>>>> 35e3c96 (Update DARPlayer and DashDownloader for real-time timestamping)
         return;
     }
 

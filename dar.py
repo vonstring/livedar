@@ -10,6 +10,7 @@ import tempfile
 import threading
 import json
 import shutil
+from datetime import datetime, timedelta
 
 from libmediapipe.analyze import Analyzer
 
@@ -101,7 +102,14 @@ class DashDownloader:
             mpd_content = response.content
             root = ElementTree.fromstring(mpd_content)
 
-            # Namespace dictionary to map namespace URIs to prefixes
+            # Extract the availabilityStartTime from the MPD
+            availability_start_time = root.get('availabilityStartTime')
+            if availability_start_time:
+                availability_start_time_dt = datetime.strptime(availability_start_time, '%Y-%m-%dT%H:%M:%SZ')
+            else:
+                print("Warning: availabilityStartTime not found in MPD")
+                availability_start_time_dt = datetime.utcnow()
+
             ns = {'ns': 'urn:mpeg:dash:schema:mpd:2011'}
 
             for representation in root.findall(".//ns:Representation", namespaces=ns):
@@ -120,14 +128,17 @@ class DashDownloader:
                     r = int(s.get('r'))
                     segnum = start_number + r
 
-                    # Timestamps
                     startts = (float(t) + (r * d)) / timescale
                     endts = startts + (float(d) / timescale)
 
+                    # Compute the real-time timestamp using availabilityStartTime
+                    real_start_time = (availability_start_time_dt + timedelta(seconds=startts)).timestamp()
+                    real_end_time = (availability_start_time_dt + timedelta(seconds=endts)).timestamp()
+
                     s = {
                         "segnum": segnum,
-                        "startts": startts,
-                        "endts": endts,
+                        "startts": real_start_time,
+                        "endts": real_end_time,
                         "url": os.path.split(mpd_url)[0] + "/" + media,
                         "dst": media,
                         "init_dst": initialization,
@@ -262,6 +273,7 @@ class LiveAnalyzer(threading.Thread):
                         # Timestamp is NOT relative, just keep it
                         continue
                     info["start"] += segment["startts"]
+
                     if "end" in info:
                         info["end"] += segment["startts"]
                     else:
@@ -272,14 +284,14 @@ class LiveAnalyzer(threading.Thread):
 
             # We now got results, append to a running window of state and update the target file
             aux_state.extend(res)
-
             # We run with a 120 second window
             cutoff = segment["startts"] - 120
             aux_state = [d for d in aux_state if d["start"] >= cutoff]
 
             # We now save the state too
-            with open(self.target_file, "w") as f:
+            with open(self.target_file+".tmp", "w") as f:
                 json.dump(aux_state, f)
+            os.rename(self.target_file+".tmp", self.target_file)
 
             if len(aux_state) == 0:
                 print("No DAR state")
