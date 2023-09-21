@@ -162,7 +162,12 @@ class DashDownloader:
         last_segment = None  # We want to download *1* version of each segment
 
         while not stop_event.is_set():
-            segments = self.get_segments_from_mpd(self.mpd_url, self.target_mpd)
+            try:
+                segments = self.get_segments_from_mpd(self.mpd_url, self.target_mpd)
+            except Exception as e:
+                print("Failed to get MPD", e)
+                time.sleep(5)
+                continue
 
             for segment in segments:
 
