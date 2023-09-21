@@ -100,7 +100,7 @@ class DARPlayer {
 
         const currentTime = vid.currentTime;
         console.log("Playing, current time is", currentTime, this.to.pos, this.to.pos - currentTime);
-        if (Math.abs(currentTime - this.to.pos) > 2) {
+        if (Math.abs(currentTime - this.to.pos) > 0.1) {
             console.log("UPDATING TO", currentTime)
             this.to.update({position: currentTime, velocity: 1});
         }
