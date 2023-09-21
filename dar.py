@@ -10,7 +10,7 @@ import tempfile
 import threading
 import json
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from libmediapipe.analyze import Analyzer
 
@@ -106,6 +106,7 @@ class DashDownloader:
             availability_start_time = root.get('availabilityStartTime')
             if availability_start_time:
                 availability_start_time_dt = datetime.strptime(availability_start_time, '%Y-%m-%dT%H:%M:%SZ')
+                availability_start_time_dt = availability_start_time_dt.replace(tzinfo=timezone.utc)
             else:
                 print("Warning: availabilityStartTime not found in MPD")
                 availability_start_time_dt = datetime.utcnow()
