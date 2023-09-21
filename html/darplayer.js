@@ -61,6 +61,13 @@ class DARPlayer {
 
     // Listen for error events.
     player.addEventListener('error', this.onErrorEvent);
+    this.videoElement.addEventListener('pause', () => {
+      console.log("PAUSE");
+      if (this._resizeTimer) {
+        clearTimeout(this._resizeTimer);
+        this._resizeTimer = null;
+      }
+    });
 
     // Try to load a manifest.
     // This is an asynchronous process.
