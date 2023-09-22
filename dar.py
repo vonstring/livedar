@@ -260,7 +260,7 @@ class LiveAnalyzer(threading.Thread):
 
             # Create a temporary named file
 
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as temp_file:
                 with open(segment["initfile"], 'rb') as init_file, open(segment["path"], 'rb') as data_file:
                     temp_file.write(init_file.read())
                     temp_file.write(data_file.read())
