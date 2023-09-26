@@ -6,7 +6,7 @@ class DARPlayer {
     this.playButton = document.querySelector(playButtonSelector);
     this.markingBox = document.querySelector(markingBoxSelector);
     this.overlay = document.querySelector(overlaySelector);
-    this.darUri = darUri
+    this.darUrl = new URL(darUri, location.href);
     this.player = null;
     this.moveId = 1;
     this._resizeTimer = null;
@@ -112,19 +112,30 @@ class DARPlayer {
     vid.play();
   }
 
-  updateAuxData() {
-    const timestampOffset = this.player.getPresentationStartTimeAsDate().getTime() / 1000;
-    fetch(this.darUri).then(res => res.json())
-    .then(response => {
+  async updateAuxData() {
+    const presentationTime = this.player.getPresentationStartTimeAsDate().getTime() / 1000;
+    const realCurrentTime = this.videoElement.currentTime + presentationTime;
+    const bufferAhead = 20;
+    let pos = realCurrentTime;
+    
+    while (pos < realCurrentTime + 20) {
+      const uri = new URL(`dar-${pos - pos % 5 + 5}.json`, this.darUrl);
+      const r = await fetch(uri);
+      // break if not ok
+      if (!r.ok) break;
+  
+      const response = await r.json();
+      
         this.sequencer.clear();
         response.forEach(item => {
             item.type = item.type || "aux";
-            this.sequencer.addCue(String(Math.random()), new TIMINGSRC.Interval(item.start - timestampOffset, item.end - timestampOffset), item);
+            this.sequencer.addCue(String(Math.random()), new TIMINGSRC.Interval(item.start - presentationTime, item.end - presentationTime), item);
         });
-        const lastTime = response[response.length-1].end - timestampOffset;
+        const lastTime = response[response.length-1].end - presentationTime;
         const currentTime = this.videoElement.currentTime;
         console.log(lastTime, currentTime, lastTime - currentTime);
-    });
+        pos += 5;
+      }
   }
 
   handleChangeOnSequencer(item) {
@@ -247,14 +258,7 @@ class DARPlayer {
 
     if (changed) {
         clearTimeout(this._resize_timer);
-<<<<<<< HEAD
-        let s = this;
-        this._resize_timer = setTimeout(function() {
-            s.resize(this.videoElement, pos, force);
-        }, 1000);
-=======
         this._resize_timer = setTimeout(() => this.resize(this.videoElement, pos, force), 1000);
->>>>>>> 35e3c96 (Update DARPlayer and DashDownloader for real-time timestamping)
         return;
     }
 
@@ -316,7 +320,7 @@ class DARPlayer {
 
   attachEventListeners() {
     this.playButton.addEventListener("click", this.handlePlayButtonClick.bind(this));
-    setInterval(this.updateAuxData.bind(this), 2000);
+    setInterval(this.updateAuxData.bind(this), 5000);
     this.sequencer.on("change", this.handleChangeOnSequencer.bind(this));
 
     window.addEventListener("resize", () => {

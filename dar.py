@@ -241,6 +241,9 @@ class LiveAnalyzer(threading.Thread):
 
         aux_state = []
         last_seg = 0
+        current_aux_data = []
+        current_ts = None
+
         print(" **** Live analyzer running *** ")
         while not self.stop_event.is_set():
 
@@ -291,17 +294,40 @@ class LiveAnalyzer(threading.Thread):
             # We now got results, append to a running window of state and update the target file
             aux_state.extend(res)
             # We run with a 120 second window
-            cutoff = segment["startts"] - 120
+            aux_segment_length = 5
+            cutoff = current_ts or segment["startts"] - 120
             aux_state = [d for d in aux_state if d["start"] >= cutoff]
+            # sort aux_state by start time
+            aux_state.sort(key=lambda x: x["start"])
 
-            # We now save the state too
-            with open(self.target_file+".tmp", "w") as f:
-                json.dump(aux_state, f)
-            os.rename(self.target_file+".tmp", self.target_file)
+            def flush():
+                nonlocal current_aux_data, current_ts
+                print("Flushing DAR info")
+                if len(current_aux_data) > 0:
+                    print(current_aux_data[0]["start"], current_aux_data[-1]["start"])
+                print(current_ts)
+                fn = "dar-%d.json" % current_ts
+                fn = os.path.join(self.target_file, fn)
+                with open(fn+".tmp", "w") as f:
+                    json.dump(current_aux_data, f)
+                os.rename(fn+".tmp", fn)
+                current_aux_data = []
 
-            if len(aux_state) == 0:
-                print("No DAR state")
+            if len(res) == 0:
+                while current_ts and segment["endts"] > current_ts + aux_segment_length:
+                    flush()
+                    current_ts = current_ts + aux_segment_length
             else:
+                for d in res:
+                    if current_ts == None:
+                        current_ts = segment["startts"] - (segment["startts"] % aux_segment_length)
+                    if d["start"] <= current_ts:
+                        print("hey")
+                    if d["start"] >= current_ts + aux_segment_length:
+                        flush()
+                    current_ts =  d["start"] - (d["start"] % aux_segment_length)
+                    current_aux_data.append(d)
+
                 print("DAR info from", aux_state[0]["start"], "to", aux_state[-1]["start"])
 
 
