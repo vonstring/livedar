@@ -17,6 +17,11 @@ from io import BytesIO
 import imagehash
 from fuzzywuzzy import StringMatcher
 
+from scenedetect import VideoManager
+from scenedetect import SceneManager
+from scenedetect.detectors import ContentDetector, AdaptiveDetector
+import time
+
 
 try:
     from .Analyzers import FaceAnalyzer, PoseAnalyzer
@@ -393,8 +398,10 @@ class Analyzer:
         self.options = options
         self._face_analyzer = FaceAnalyzer(options)
         self._pose_analyzer = PoseAnalyzer(options)
+        self._detector = AdaptiveDetector()
         self.people = []
         self.faces = {}
+        self._global_frame_num = 0
 
     def make_segments(self, split_x, split_y, shape, padding=0.1):
         height, width, channels = shape
@@ -721,13 +728,19 @@ class Analyzer:
             if name in people:
                 del people[name]
         return people
+    
+    def detect_scene(self, img):
+        scene = self._detector.process_frame(self._global_frame_num, img)
+        self._global_frame_num += 1
+        return scene
 
     def analyze_video(self, video, options):
-
         if options.iframes:
             iframes = self.get_iframes(video)
         else:
             iframes = None
+        
+        start_global_frame = self._global_frame_num
 
         # We need the directory of the video
         target_dir = os.path.split(video)[0]
@@ -767,15 +780,15 @@ class Analyzer:
         while cap.isOpened():
             success, image = cap.read()
             frame_nr += 1
+
             if not success:
                 if os.path.exists(video):
                     break
+                # if video is string and starts with http
 
                 print("Ignoring empty camera frame.")
                 # If loading a video, use 'break' instead of 'continue'.
                 continue
-
-            success, image = cap.read()
 
             try:
                 img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -783,7 +796,16 @@ class Analyzer:
                 print("No more images - guessing we're done?")
                 break
 
+            fps = cap.get(cv2.CAP_PROP_FPS)
+
+            new_scene = self.detect_scene(img)
+            if new_scene:
+                iframes = (iframes or []) + [(f - start_global_frame) / fps for f in new_scene]
+                print("New scene at", cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.)
+                print(new_scene, frame_nr, iframes)
+
             ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
+
             # If we're using iframes, only process iframes (for now)
             if options.startts > 0 and options.startts > ts:
                 continue
@@ -1085,6 +1107,7 @@ class Analyzer:
             end_time = max(end_time, face.endts)
 
         scene_shift = False
+
         while True:
             if current_ts >= end_time:
                 break
@@ -1123,19 +1146,23 @@ class Analyzer:
                 continue
 
             next_ts =  current_ts + max(min_show_time, min(max_show_time, face.endts - face.startts))
+            print("looking at", current_ts, next_ts, iframes)
 
             # MOVE THIS TO A COMPRESS FUNCTION
             if iframes:
                 # Align with iframe if one is very close                
                 for ts in iframes:
-
-                    # diff = abs(current_ts - next_ts)
-                    diff = abs(ts - next_ts)
-                    if diff < 0.5:
-                        print("CLOSE TO IFRAME, aligning", ts)
-                        next_ts = ts
+                    if ts < current_ts:
+                        continue
+                    if ts == current_ts:
+                        print("setting sceneshift")
                         scene_shift = True
+                        continue
+                    if ts >= next_ts:
                         break
+                    next_ts = ts
+                if scene_shift:
+                    print("Scene shift at", ts)
 
             # Pick one (sort by orientation or something?)
             selected = self.sort_faces_by_heading_and_size(candidates, current_ts, next_ts)
@@ -1145,6 +1172,8 @@ class Analyzer:
             positions = face.get_positions(current_ts, next_ts)
             if len(positions) > 0:
                 if iframes and scene_shift:
+                    print("adding sceneshift to selection")
+                    print(scene_shift)
                     positions[0]["animate"] = False
                     scene_shift = False
 
@@ -1298,7 +1327,7 @@ if __name__ == "__main__":
       res = analyzer.analyze_images(options.images, options)
 
 
-    cv2.waitKey()
+    # cv2.waitKey()
 
     print("Dumping result")
 

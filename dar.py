@@ -224,6 +224,7 @@ class Options:
         self.endts = None
         self.cast = cast
         self.show = False
+        self.cb = None
 
 
 class LiveAnalyzer(threading.Thread):
@@ -305,6 +306,10 @@ class LiveAnalyzer(threading.Thread):
                 print("Flushing DAR info")
                 if len(current_aux_data) > 0:
                     print(current_aux_data[0]["start"], current_aux_data[-1]["start"])
+                for item in current_aux_data:
+                    if item["animate"] == False:
+                        print("Has scene")
+
                 print(current_ts)
                 fn = "dar-%d.json" % current_ts
                 fn = os.path.join(self.target_file, fn)
