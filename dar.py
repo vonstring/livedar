@@ -311,7 +311,7 @@ class LiveAnalyzer(threading.Thread):
                 for item in current_aux_data:
                     if item["animate"] == False:
                         print("Has scene")
-
+                current_aux_data = [{key: item[key] for key in ["start", "end", "animate", "pos"]} for item in current_aux_data]
                 print(current_ts)
                 fn = "dar-%d.json" % current_ts
                 fn = os.path.join(self.target_file, fn)
