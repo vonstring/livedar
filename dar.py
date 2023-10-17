@@ -82,16 +82,18 @@ class DashDownloader:
         # print("Download segment", url, "to", filename)
         if segnum and os.path.exists(filename):
             return
-
-        response = self.session.get(url, stream=True)
-        if response.status_code == 200:
-            with open(filename, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-            return filename
-        else:
-            print(f"Failed to download segment. HTTP Status code: {response.status_code}")
+        try:
+            response = self.session.get(url, stream=True)
+            response.raise_for_status()
+            if response.status_code == 200:
+                with open(filename, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                return filename
+        except Exception as e:
+            print("Failed to download segment")
+            print(e)
         return None
 
     def get_segments_from_mpd(self, mpd_url, mpd_dst):
