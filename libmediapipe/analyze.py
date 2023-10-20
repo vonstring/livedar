@@ -398,7 +398,7 @@ class Analyzer:
         self.options = options
         self._face_analyzer = FaceAnalyzer(options)
         self._pose_analyzer = PoseAnalyzer(options)
-        self._detector = AdaptiveDetector()
+        self._detector = AdaptiveDetector(adaptive_threshold=3.0)
         self.people = []
         self.faces = {}
         self._global_frame_num = 0
@@ -1142,6 +1142,8 @@ class Analyzer:
                     if face.startts > current_ts:
                         next_ts = min(face.startts, next_ts)
 
+                print("No candidates, skipping to", next_ts)
+
                 current_ts = next_ts
                 continue
 
@@ -1178,6 +1180,15 @@ class Analyzer:
                     scene_shift = False
 
                 new_selection.extend(positions)
+            else:
+                if iframes:
+                    for ts in iframes:
+                        if ts <= current_ts:
+                            continue
+                        if ts >= next_ts:
+                            break
+                        print("adding dummy scene shift at", ts)
+                        new_selection.append({"start": ts, "end": ts + 1/50, "pos": [50,50], "animate": True, "dummy": True})
 
             # new_selection.append({"start": current_ts, "end": next_ts, "pos": face.get_position()})
 
