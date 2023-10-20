@@ -29,6 +29,32 @@ except:
     from Analyzers import FaceAnalyzer, PoseAnalyzer
 
 
+class VideoSource:
+    def __init__(self):
+        self.fps = 50
+    
+    def __iter__(self):
+        pass
+
+class CVCaptureSource(VideoSource):
+    def __init__(self, video):
+        self.cap = cv2.VideoCapture(video)
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.pos = 0
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                raise StopIteration
+            self.pos += 1
+            return frame
+        else:
+            raise StopIteration
+
 def dist_a_b(a, b):
     dist = math.sqrt(math.pow(a["x"] - b["x"], 2) + math.pow(a["y"] - b["y"], 2))
     return dist
@@ -734,38 +760,40 @@ class Analyzer:
         self._global_frame_num += 1
         return scene
 
-    def analyze_video(self, video, options):
-        if options.iframes:
-            iframes = self.get_iframes(video)
-        else:
-            iframes = None
+    def analyze_video(self, video, options, duration=None):
+        # if options.iframes:
+        #     iframes = self.get_iframes(video)
+        # else:
+        #     iframes = None
+
+        iframes = None
         
         start_global_frame = self._global_frame_num
 
-        # We need the directory of the video
-        target_dir = os.path.split(video)[0]
+        # if 0 and os.path.exists("/tmp/analysis.json"):
+        #     print("Using cached results, iframes:", len(iframes))
+        #     ret = json.load(open("/tmp/analysis.json", "r"))
+        #     if options.startts:
+        #         for idx, item in enumerate(ret):
+        #             if item["start"] >= options.startts:
+        #                 break
+        #         ret = ret[idx:]
 
+        #     if options.endts:
+        #         for idx, item in enumerate(ret):
+        #             if item["start"] >= options.endts:
+        #                 break
+        #         ret = ret[:idx]
 
-        if 0 and os.path.exists("/tmp/analysis.json"):
-            print("Using cached results, iframes:", len(iframes))
-            ret = json.load(open("/tmp/analysis.json", "r"))
-            if options.startts:
-                for idx, item in enumerate(ret):
-                    if item["start"] >= options.startts:
-                        break
-                ret = ret[idx:]
+        #     faces = self.track_faces(ret)
 
-            if options.endts:
-                for idx, item in enumerate(ret):
-                    if item["start"] >= options.endts:
-                        break
-                ret = ret[:idx]
+        #     return self.select_by_face(faces, iframes=iframes)
+        
+        if isinstance(video, VideoSource):
+            cap = video
+        else:
+            cap = CVCaptureSource(video)
 
-            faces = self.track_faces(ret)
-
-            return self.select_by_face(faces, iframes=iframes)
-
-        cap = cv2.VideoCapture(video)
         ret = []
         i = 0
         frame_nr = -1
@@ -774,37 +802,37 @@ class Analyzer:
         snap_at = {"ts": 0}
         people = {}
         text_debug = open("/tmp/text_extracts.txt", "w")
-        if not cap.isOpened():
-            print("Could not open video capture")
+        # if not cap.isOpened():
+        #     print("Could not open video capture")
 
-        while cap.isOpened():
-            success, image = cap.read()
-            frame_nr += 1
+        fps = cap.fps
 
-            if not success:
-                if os.path.exists(video):
-                    break
-                # if video is string and starts with http
-
-                print("Ignoring empty camera frame.")
-                # If loading a video, use 'break' instead of 'continue'.
-                continue
-
+        while True:
+            if duration and frame_nr / fps > duration:
+                break
             try:
-                img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            except:
-                print("No more images - guessing we're done?")
+                image = next(cap)
+            except StopIteration:
                 break
 
-            fps = cap.get(cv2.CAP_PROP_FPS)
+            img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            frame_nr += 1
+
+            # if not success:
+            #     if os.path.exists(video):
+            #         break
+            #     # if video is string and starts with http
+
+            #     print("Ignoring empty camera frame.")
+            #     # If loading a video, use 'break' instead of 'continue'.
+            #     continu
 
             new_scene = self.detect_scene(img)
             if new_scene:
                 iframes = (iframes or []) + [(f - start_global_frame) / fps for f in new_scene]
-                print("New scene at", cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.)
                 print(new_scene, frame_nr, iframes)
 
-            ts = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.
+            ts = frame_nr / fps
 
             # If we're using iframes, only process iframes (for now)
             if options.startts > 0 and options.startts > ts:
@@ -892,9 +920,9 @@ class Analyzer:
                     break
             ret = ret[idx:]
 
-        if options.endts:
+        if options.endts or duration:
             for idx, item in enumerate(ret):
-                if item["start"] >= options.endts:
+                if item["start"] >= min(options.endts, (options.startts or 0) + duration):
                     break
             ret = ret[:idx]
 
