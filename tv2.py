@@ -60,8 +60,8 @@ def analyze_to_disk(stream_url, segment_length=5, dest="output/"):
             fn = os.path.join(dest, "dar-%d.json" % item["pos"])
             with open(fn, "w") as f:
                 json.dump(item["data"], f)
-            with open(os.path.join(dest, "complete.txt"), "w") as f:
-                f.write("ok")
+        with open(os.path.join(dest, "complete.txt"), "w") as f:
+            f.write("ok")
     except Exception as e:
         print(e)
     finally:
