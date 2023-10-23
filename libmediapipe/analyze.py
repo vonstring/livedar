@@ -32,12 +32,17 @@ except:
 class VideoSource:
     def __init__(self):
         self.fps = 50
+        self.pos = 0
     
     def __iter__(self):
         pass
 
+    def __next__(self):
+        pass
+
 class CVCaptureSource(VideoSource):
     def __init__(self, video):
+        super().__init__()
         self.cap = cv2.VideoCapture(video)
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.pos = 0
@@ -54,6 +59,63 @@ class CVCaptureSource(VideoSource):
             return frame
         else:
             raise StopIteration
+        
+class FFmpegVideoSource(VideoSource):
+    def __init__(self, url):
+        self.width, self.height, self.fps, best_stream_index = self.get_video_info(url)
+        self.command = ["ffmpeg",
+                "-i", url,
+                "-map", f"0:v:{best_stream_index}",
+                "-f", "image2pipe",
+                "-pix_fmt", "bgr24",
+                "-vcodec", "rawvideo", "-"]
+        print(self.width, self.height, self.fps)
+        self.pipe = subprocess.Popen(self.command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**6)
+        self.stderr = ""
+        self.done = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.pipe.poll() is not None:
+            self.done = True
+            #self.stderr += self.pipe.stderr.read().decode('utf-8')
+            raise StopIteration
+        raw_image = self.pipe.stdout.read(self.width * self.height * 3)
+        if raw_image == b'':
+            self.done = True
+            # self.stderr += self.pipe.stderr.read().decode('utf-8')
+            raise StopIteration
+        image = np.frombuffer(raw_image, dtype='uint8')
+        image = image.reshape((self.height, self.width, 3))
+        return image
+
+    @staticmethod
+    def get_video_info(url):
+        def calculate_fps(r_frame_rate):
+            numerator, denominator = map(int, r_frame_rate.split('/'))
+            if denominator == 0:
+                return 0
+            return numerator / denominator
+        
+        command = ["ffprobe",
+                "-v", "error",
+                "-show_entries", "stream=width,height,r_frame_rate",
+                "-of", "json",
+                url]
+        output = subprocess.check_output(command).decode('utf-8')
+        video_info = json.loads(output)
+        print(video_info)
+        # Find the stream with the highest resolution
+        best_stream_index, best_stream = max(enumerate(video_info['streams']), key=lambda x: x[1].get('width', 0) * x[1].get('height', 0) * calculate_fps(x[1].get('r_frame_rate', '0/1')))
+
+        width = best_stream['width']
+        height = best_stream['height']
+        r_frame_rate = best_stream['r_frame_rate']
+        fps = calculate_fps(r_frame_rate)
+
+        return width, height, fps, best_stream_index
 
 def dist_a_b(a, b):
     dist = math.sqrt(math.pow(a["x"] - b["x"], 2) + math.pow(a["y"] - b["y"], 2))
@@ -756,6 +818,9 @@ class Analyzer:
         return people
     
     def detect_scene(self, img):
+        # downscale img by a factor of 0.5
+
+        img = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_NEAREST)
         scene = self._detector.process_frame(self._global_frame_num, img)
         self._global_frame_num += 1
         return scene
@@ -817,6 +882,8 @@ class Analyzer:
 
             img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             frame_nr += 1
+            # if frame_nr % cap.fps == 0:
+            #     print("Frame %d (%.2f s)" % (frame_nr, frame_nr / cap.fps))
 
             # if not success:
             #     if os.path.exists(video):
@@ -922,7 +989,10 @@ class Analyzer:
 
         if options.endts or duration:
             for idx, item in enumerate(ret):
-                if item["start"] >= min(options.endts, (options.startts or 0) + duration):
+                limit = (options.startts or 0) + duration
+                if options.endts:
+                    limit = min(options.endts, limit)
+                if item["start"] >= limit:
                     break
             ret = ret[:idx]
 
